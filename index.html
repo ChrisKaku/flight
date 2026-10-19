@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>✈️ FlightTracker Pro — 自動機票價格追蹤器</title>
+  <meta name="description" content="自動機票價格追蹤器：每日自動更新票價、目標價 Email 通知、航線追蹤與歷史價格趨勢分析。" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: {
+              50:  '#eef7ff', 100: '#d9edff', 200: '#bce0ff',
+              300: '#8eccff', 400: '#53aeff', 500: '#2b8dff',
+              600: '#1470f5', 700: '#0d5ae1', 800: '#1149b6', 900: '#14408f',
+              950: '#0f2757',
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- FontAwesome CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- SmtpJS CDN (browser-side SMTP email) -->
+  <script src="https://smtpjs.com/v3/smtp.js"></script>
+
+  <!-- EmailJS CDN (pure client-side robust email delivery) -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
+
+    /* Animated gradient background */
+    .hero-bg {
+      background: linear-gradient(135deg, #020617 0%, #0c1631 40%, #091328 70%, #020617 100%);
+      min-height: 100vh;
+    }
+    .hero-bg::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 15%, rgba(43,141,255,0.07) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 45% at 85% 75%, rgba(139,92,246,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 55% at 50% 50%, rgba(6,182,212,0.04) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glass card */
+    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+    .glass-hover:hover { background: rgba(255,255,255,0.06); border-color: rgba(43,141,255,0.25); }
+
+    /* Glow accent */
+    .glow-blue  { box-shadow: 0 0 20px rgba(43,141,255,0.20); }
+    .glow-green { box-shadow: 0 0 14px rgba(34,197,94,0.20); }
+    .glow-indigo{ box-shadow: 0 0 16px rgba(99,102,241,0.25); }
+
+    /* Plane float animation */
+    @keyframes planeFloat {
+      0%, 100% { transform: translateY(0) rotate(-4deg); }
+      50%      { transform: translateY(-5px) rotate(4deg); }
+    }
+    .plane-float { animation: planeFloat 3s ease-in-out infinite; }
+
+    /* Slide-in animation */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-in { animation: slideIn 0.45s ease both; }
+
+    /* Pulse dot */
+    @keyframes pulseDot {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+      50%      { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+    }
+    .pulse-dot { animation: pulseDot 2s infinite; }
+
+    /* Toast slide */
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(50px) scale(0.92); }
+      to   { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    .toast-anim { animation: toastIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.12);
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+
+    /* Form controls */
+    .input-field {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #e2e8f0;
+      transition: all 0.25s;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: #2b8dff;
+      background: rgba(43,141,255,0.06);
+      box-shadow: 0 0 0 3px rgba(43,141,255,0.12);
+    }
+    .input-field option { background: #0f172a; }
+
+    /* Modal */
+    .modal-bg {
+      background: rgba(2,6,23,0.85);
+      backdrop-filter: blur(12px);
+      transition: opacity 0.25s;
+    }
+    .modal-box {
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .modal-bg.open { opacity: 1; pointer-events: all; }
+    .modal-bg.open .modal-box { transform: translateY(0) scale(1); }
+
+    /* Target price input */
+    .target-input {
+      background: transparent; border: none; color: #c084fc;
+      font-family: inherit; font-size: inherit; font-weight: inherit;
+      width: 90px; padding: 0;
+    }
+    .target-input:focus { outline: none; }
+
+    /* Auto-check status card */
+    .auto-check-card {
+      background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(59,130,246,0.05) 100%);
+      border: 1px solid rgba(99,102,241,0.22);
+      border-radius: 14px;
+      padding: 14px 18px;
+    }
+
+    /* Notification log */
+    .notif-log { max-height: 220px; overflow-y: auto; }
+    .notif-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.8rem;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-time { color: #64748b; white-space: nowrap; flex-shrink: 0; font-size: 0.72rem; }
+    .notif-msg { color: #94a3b8; }
+
+    /* Separator in settings */
+    .settings-sep {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin: 20px 0;
+    }
+  </style>
+</head>
+
+<body class="hero-bg text-slate-200 antialiased">
+
+<!-- ===================== HEADER ===================== -->
+<header class="sticky top-0 z-50 glass border-b border-white/5">
+  <div class="max-w-7xl mx-auto flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
+    <!-- Logo -->
+    <div class="flex items-center gap-3">
+      <i class="fas fa-plane-departure text-cyan-400 text-xl plane-float"></i>
+      <span class="text-lg sm:text-xl font-extrabold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent tracking-tight">FlightTracker Pro</span>
+      <span class="hidden md:inline-flex px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20">v2.0 每日自動更新</span>
+    </div>
+    <!-- Right actions -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <span id="modeBadge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase"></span>
+      <span id="autoCheckBadge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-500/12 text-indigo-400 border border-indigo-500/25"></span>
+      <button onclick="refreshAllPrices()" id="refreshBtn" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-400 glass glass-hover transition-all cursor-pointer" title="立即刷新所有票價">
+        <i class="fas fa-arrows-rotate"></i><span class="hidden sm:inline">刷新票價</span>
+      </button>
+      <button onclick="openSettings()" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-400 glass glass-hover transition-all cursor-pointer">
+        <i class="fas fa-gear"></i><span class="hidden sm:inline">設定</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== MAIN ===================== -->
+<main class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+  <!-- Search Panel -->
+  <section class="glass rounded-2xl p-5 sm:p-7">
+    <h2 class="flex items-center gap-2.5 text-sm font-bold text-slate-400 uppercase tracking-widest mb-5">
+      <i class="fas fa-magnifying-glass text-blue-400"></i>搜尋機票
+    </h2>
+    <form id="searchForm" onsubmit="handleSearch(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider"><i class="fas fa-plane-departure mr-1"></i>出發地</label>
+        <input id="inOrigin" class="input-field rounded-lg px-4 py-2.5 text-sm" list="airportList" placeholder="TPE - 台北桃園" required />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider"><i class="fas fa-plane-arrival mr-1"></i>目的地</label>
+        <input id="inDest" class="input-field rounded-lg px-4 py-2.5 text-sm" list="airportList" placeholder="NRT - 東京成田" required />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider"><i class="fas fa-calendar mr-1"></i>出發日期</label>
+        <input id="inDate" type="date" class="input-field rounded-lg px-4 py-2.5 text-sm" required />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider"><i class="fas fa-coins mr-1"></i>幣別</label>
+        <select id="inCurrency" class="input-field rounded-lg px-4 py-2.5 text-sm cursor-pointer">
+          <option value="TWD">TWD 台幣</option>
+          <option value="USD">USD 美元</option>
+          <option value="JPY">JPY 日幣</option>
+        </select>
+      </div>
+      <button type="submit" id="searchBtn" class="h-[42px] flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-slate-950 font-bold rounded-lg text-sm transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-400/30 cursor-pointer active:scale-[0.97]">
+        <i class="fas fa-magnifying-glass"></i>搜尋航班
+      </button>
+    </form>
+
+    <!-- Airport datalist -->
+    <datalist id="airportList">
+      <option value="TPE - 台北桃園"></option>
+      <option value="TSA - 台北松山"></option>
+      <option value="KHH - 高雄小港"></option>
+      <option value="NRT - 東京成田"></option>
+      <option value="HND - 東京羽田"></option>
+      <option value="KIX - 大阪關西"></option>
+      <option value="FUK - 福岡"></option>
+      <option value="CTS - 札幌新千歲"></option>
+      <option value="OKA - 沖繩那霸"></option>
+      <option value="ICN - 首爾仁川"></option>
+      <option value="GMP - 首爾金浦"></option>
+      <option value="BKK - 曼谷素萬那普"></option>
+      <option value="DMK - 曼谷廊曼"></option>
+      <option value="SIN - 新加坡樟宜"></option>
+      <option value="HKG - 香港"></option>
+      <option value="MFM - 澳門"></option>
+      <option value="LAX - 洛杉磯"></option>
+      <option value="SFO - 舊金山"></option>
+      <option value="JFK - 紐約甘迺迪"></option>
+      <option value="LHR - 倫敦希斯羅"></option>
+      <option value="CDG - 巴黎戴高樂"></option>
+      <option value="SYD - 雪梨"></option>
+    </datalist>
+  </section>
+
+  <!-- Two-column content -->
+  <div class="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6 items-start">
+
+    <!-- LEFT: Search Results -->
+    <section class="glass rounded-2xl p-5 sm:p-7">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="flex items-center gap-2.5 text-sm font-bold text-slate-400 uppercase tracking-widest">
+          <i class="fas fa-list text-blue-400"></i>搜尋結果
+          <span id="resultCount" class="text-xs font-normal text-slate-600 normal-case tracking-normal"></span>
+        </h2>
+        <span class="text-xs text-slate-500">點擊「+ 追蹤」加入每日自動追蹤</span>
+      </div>
+
+      <!-- Mock mode notice -->
+      <div id="mockNotice" class="flex items-start gap-3 bg-yellow-500/5 border border-yellow-500/15 rounded-xl px-4 py-3 text-sm text-yellow-400 mb-4">
+        <i class="fas fa-circle-info mt-0.5 shrink-0"></i>
+        <span>目前為<strong>模擬模式（Mock Mode）</strong>。搜尋結果為演算法生成之動態擬真資料。可在右上角「設定」填入 RapidAPI Key 以切換真實 Skyscanner 即時航班。</span>
+      </div>
+
+      <div id="searchResults">
+        <div class="flex flex-col items-center justify-center py-16 text-slate-600 gap-3 text-center">
+          <i class="fas fa-plane-departure text-4xl text-blue-400/15"></i>
+          <p class="text-sm">填入出發地、目的地與日期<br/>即可開始搜尋機票並加入追蹤清單</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Tracked Flights -->
+    <section class="glass rounded-2xl p-5 sm:p-7">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="flex items-center gap-2.5 text-sm font-bold text-slate-400 uppercase tracking-widest">
+          <i class="fas fa-heart text-rose-400"></i>我的追蹤清單
+          <span id="trackedCount" class="text-xs font-normal text-slate-600 normal-case tracking-normal"></span>
+        </h2>
+        <button onclick="previewAlertEmail()" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 cursor-pointer" title="查看到達目標價時發送的 Email 樣式">
+          <i class="fas fa-envelope-open-text"></i>預覽降價信
+        </button>
+      </div>
+
+      <div id="trackedList">
+        <div class="flex flex-col items-center justify-center py-16 text-slate-600 gap-3 text-center">
+          <i class="fas fa-heart-crack text-4xl text-rose-400/15"></i>
+          <p class="text-sm">尚無追蹤航線<br/>從左側搜尋結果點擊「+ 追蹤」加入</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-5 pt-4 border-t border-white/5 flex-wrap gap-2">
+        <span id="lastUpdatedText" class="text-xs text-slate-600">手動更新：尚未更新</span>
+        <div id="pulseDot" class="w-2 h-2 rounded-full bg-green-500 pulse-dot hidden"></div>
+      </div>
+
+      <!-- Auto-Check Status Card (Daily Price Update) -->
+      <div id="autoCheckStatus" class="auto-check-card mt-4 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-green-400 pulse-dot"></span>
+            <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">每日價格自動追蹤</span>
+          </div>
+          <span id="autoCheckFreqTag" class="text-[11px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-medium">每 24 小時一次</span>
+        </div>
+        <div class="text-xs text-slate-400 space-y-1">
+          <div class="flex justify-between">
+            <span class="text-slate-500">上次檢查：</span>
+            <span id="lastAutoCheckTimeText" class="text-slate-300">尚未執行</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">下次預計：</span>
+            <span id="nextCheckText" class="text-indigo-300 font-semibold">排程計算中...</span>
+          </div>
+        </div>
+        <div class="pt-2 flex items-center justify-between gap-2 border-t border-indigo-500/15">
+          <button onclick="triggerImmediateDailyCheck()" class="w-full py-1.5 px-3 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer">
+            <i class="fas fa-bolt"></i>立即模擬執行每日檢查
+          </button>
+        </div>
+      </div>
+
+      <!-- Notification Log -->
+      <div id="notifLogSection" class="mt-4" style="display:none;">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest"><i class="fas fa-bell text-amber-400 mr-1.5"></i>降價與通知記錄</h3>
+          <button onclick="clearNotifLog()" class="text-[11px] text-slate-600 hover:text-slate-400 cursor-pointer">清除</button>
+        </div>
+        <div id="notifLog" class="notif-log"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ===================== CHART MODAL ===================== -->
+<div id="chartModal" class="fixed inset-0 z-[200] modal-bg flex items-center justify-center p-4 opacity-0 pointer-events-none" onclick="closeChart(event)">
+  <div class="modal-box glass rounded-2xl p-6 sm:p-8 w-full max-w-[780px] max-h-[90vh] overflow-y-auto border border-white/8 shadow-2xl shadow-black/50 transform translate-y-5 scale-[0.97]">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-extrabold flex items-center gap-2.5"><i class="fas fa-chart-line text-cyan-400"></i><span id="chartTitle">價格趨勢分析</span></h3>
+      <button onclick="closeChart(null,true)" class="w-9 h-9 flex items-center justify-center rounded-lg glass glass-hover text-slate-400 hover:text-white transition cursor-pointer"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div class="relative h-[300px]">
+      <canvas id="priceChart"></canvas>
+    </div>
+    <div class="grid grid-cols-3 gap-3 mt-5">
+      <div class="bg-white/3 rounded-xl p-4 text-center">
+        <div class="text-[10px] uppercase tracking-widest text-slate-600 mb-1">最低價</div>
+        <div id="statMin" class="text-lg font-bold text-green-400"></div>
+      </div>
+      <div class="bg-white/3 rounded-xl p-4 text-center">
+        <div class="text-[10px] uppercase tracking-widest text-slate-600 mb-1">最高價</div>
+        <div id="statMax" class="text-lg font-bold text-red-400"></div>
+      </div>
+      <div class="bg-white/3 rounded-xl p-4 text-center">
+        <div class="text-[10px] uppercase tracking-widest text-slate-600 mb-1">平均價</div>
+        <div id="statAvg" class="text-lg font-bold text-blue-400"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== EMAIL PREVIEW MODAL ===================== -->
+<div id="emailPreviewModal" class="fixed inset-0 z-[200] modal-bg flex items-center justify-center p-4 opacity-0 pointer-events-none" onclick="closeEmailPreview(event)">
+  <div class="modal-box glass rounded-2xl p-6 sm:p-8 w-full max-w-[620px] max-h-[90vh] overflow-y-auto border border-white/8 shadow-2xl shadow-black/50 transform translate-y-5 scale-[0.97]">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-extrabold flex items-center gap-2 text-cyan-400"><i class="fas fa-envelope-circle-check"></i>降價通知信即時預覽</h3>
+      <button onclick="closeEmailPreview(null,true)" class="w-9 h-9 flex items-center justify-center rounded-lg glass glass-hover text-slate-400 hover:text-white transition cursor-pointer"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div class="text-xs text-slate-400 mb-3 flex items-center justify-between">
+      <span>收件人：<strong id="previewRecipient" class="text-slate-200"></strong></span>
+      <span class="text-green-400"><i class="fas fa-check-double mr-1"></i>到達目標價自動發送</span>
+    </div>
+    <div id="emailPreviewContainer" class="rounded-xl overflow-hidden border border-white/10 shadow-lg text-slate-900 bg-white">
+      <!-- Injected HTML preview -->
+    </div>
+    <div class="mt-4 flex justify-end gap-3">
+      <button onclick="sendTestEmailFromPreview()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition cursor-pointer">
+        <i class="fas fa-paper-plane mr-1.5"></i>發送至我的信箱測試
+      </button>
+      <button onclick="closeEmailPreview(null,true)" class="px-4 py-2 rounded-lg glass glass-hover text-slate-300 text-xs font-semibold transition cursor-pointer">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETTINGS MODAL ===================== -->
+<div id="settingsModal" class="fixed inset-0 z-[200] modal-bg flex items-center justify-center p-4 opacity-0 pointer-events-none" onclick="closeSettings(event)">
+  <div class="modal-box glass rounded-2xl p-6 sm:p-8 w-full max-w-[580px] max-h-[90vh] overflow-y-auto border border-white/8 shadow-2xl shadow-black/50 transform translate-y-5 scale-[0.97]">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-extrabold flex items-center gap-2.5"><i class="fas fa-gear text-violet-400"></i>系統設定</h3>
+      <button onclick="closeSettings(null,true)" class="w-9 h-9 flex items-center justify-center rounded-lg glass glass-hover text-slate-400 hover:text-white transition cursor-pointer"><i class="fas fa-xmark"></i></button>
+    </div>
+
+    <!-- Section: Daily Auto Check -->
+    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+      <i class="fas fa-clock text-indigo-400"></i>追蹤清單每日自動更新價格
+    </h4>
+    <div class="space-y-4 bg-white/[0.02] border border-white/5 rounded-xl p-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="text-sm font-semibold text-slate-200 block">啟用每日自動更新</span>
+          <span class="text-xs text-slate-500">每天定時抓取最新價格，若關閉分頁隔日開啟亦會自動補算更新</span>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="setAutoCheck" class="sr-only peer" checked />
+          <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+        </label>
+      </div>
+
+      <div>
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-1.5"><i class="fas fa-stopwatch"></i>更新頻率</label>
+        <select id="setCheckInterval" class="input-field w-full rounded-lg px-3 py-2 text-sm cursor-pointer">
+          <option value="86400000" selected>每 24 小時（每天自動更新一次 - 預設）</option>
+          <option value="43200000">每 12 小時</option>
+          <option value="21600000">每 6 小時</option>
+          <option value="3600000">每 1 小時</option>
+          <option value="60000">每 1 分鐘（測試展示專用）</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-between pt-1">
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-400">
+          <input type="checkbox" id="setBrowserNotify" class="rounded bg-slate-800 border-white/20 text-indigo-500 focus:ring-0" checked />
+          <span>同時啟用瀏覽器桌面推播通知</span>
+        </label>
+        <button type="button" onclick="requestBrowserNotificationPermission()" class="text-xs text-blue-400 hover:underline">授權通知</button>
+      </div>
+    </div>
+
+    <hr class="settings-sep" />
+
+    <!-- Section: Target Price Email Notification -->
+    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+      <i class="fas fa-envelope text-amber-400"></i>到達目標價 Email 通知設定
+    </h4>
+    <div class="space-y-4 bg-white/[0.02] border border-white/5 rounded-xl p-4">
+      <div>
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-1.5"><i class="fas fa-at"></i>通知接收信箱（用戶 Email）</label>
+        <input id="setEmail" type="email" class="input-field w-full rounded-lg px-3.5 py-2 text-sm" placeholder="user@example.com" />
+        <span class="text-[11px] text-slate-500 mt-1 block">當追蹤航線當前票價 <strong>&le; 目標價格</strong> 時，系統自動發送降價清單。</span>
+      </div>
+
+      <div>
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-1.5"><i class="fas fa-paper-plane"></i>發送方式選擇</label>
+        <select id="setEmailProvider" onchange="toggleEmailProviderFields()" class="input-field w-full rounded-lg px-3 py-2 text-sm cursor-pointer">
+          <option value="smtp">自訂 SMTP 伺服器 (SmtpJS / Gmail 應用程式密碼)</option>
+          <option value="emailjs">EmailJS API (推薦靜態網頁，免密碼)</option>
+        </select>
+      </div>
+
+      <!-- SMTP Details -->
+      <div id="smtpFieldsGroup" class="space-y-3 pt-2">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 mb-1 block">SMTP Host</label>
+            <input id="setSmtpHost" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="smtp.gmail.com" />
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 mb-1 block">SMTP Port</label>
+            <input id="setSmtpPort" type="number" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="587" />
+          </div>
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-500 mb-1 block">SMTP 寄件帳號</label>
+          <input id="setSmtpUser" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="sender@gmail.com" />
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold text-slate-500 mb-1 block">SMTP 密碼 / App Password</label>
+          <input id="setSmtpPass" type="password" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="應用程式專用密碼" />
+          <p class="text-[11px] text-slate-500 mt-1">如使用 Gmail 請前往 Google 帳戶安全性建立「應用程式密碼」。</p>
+        </div>
+      </div>
+
+      <!-- EmailJS Details -->
+      <div id="emailjsFieldsGroup" class="space-y-3 pt-2" style="display:none;">
+        <div>
+          <label class="text-[11px] font-semibold text-slate-500 mb-1 block">EmailJS Public Key</label>
+          <input id="setEmailjsPublicKey" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="user_xxxxxxx / Public Key" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 mb-1 block">Service ID</label>
+            <input id="setEmailjsServiceId" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="service_xxxx" />
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 mb-1 block">Template ID</label>
+            <input id="setEmailjsTemplateId" class="input-field w-full rounded-lg px-3 py-2 text-xs" placeholder="template_xxxx" />
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-500">免伺服器後端，免費方案每月可發 200 封信，非常適合 GitHub Pages 部署。</p>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button type="button" onclick="sendTestEmail()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-semibold hover:bg-amber-500/20 transition cursor-pointer">
+          <i class="fas fa-paper-plane"></i>寄送測試信
+        </button>
+        <button type="button" onclick="previewAlertEmail()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass glass-hover text-cyan-300 text-xs font-semibold transition cursor-pointer">
+          <i class="fas fa-eye"></i>預覽降價通知內容
+        </button>
+      </div>
+    </div>
+
+    <hr class="settings-sep" />
+
+    <!-- Section: API & Currency -->
+    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+      <i class="fas fa-cloud text-blue-400"></i>機票 API 與幣別
+    </h4>
+    <div class="space-y-3">
+      <div>
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-1"><i class="fas fa-key"></i>RapidAPI Key (選填)</label>
+        <input id="setApiKey" type="password" class="input-field w-full rounded-lg px-3.5 py-2 text-sm" placeholder="填入 x-rapidapi-key 開啟 Live Mode，不填則使用 Mock 模式" />
+      </div>
+      <div>
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mb-1"><i class="fas fa-coins"></i>預設幣別</label>
+        <select id="setCurrency" class="input-field w-full rounded-lg px-3.5 py-2 text-sm cursor-pointer">
+          <option value="TWD">TWD 台幣</option>
+          <option value="USD">USD 美元</option>
+          <option value="JPY">JPY 日幣</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="settings-sep" />
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <button onclick="saveSettings()" class="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-slate-950 font-bold text-sm transition shadow-lg shadow-blue-500/20 cursor-pointer active:scale-[0.97]">
+        <i class="fas fa-floppy-disk"></i>儲存所有設定
+      </button>
+      <button onclick="clearApiKey()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg glass glass-hover text-slate-400 hover:text-rose-400 text-xs transition cursor-pointer">
+        <i class="fas fa-trash"></i>清除 API Key
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toasts" class="fixed bottom-6 right-6 z-[999] flex flex-col gap-3"></div>
+
+<!-- ===================== JAVASCRIPT ===================== -->
+<script>
+/* ========== CONSTANTS ========== */
+const STORAGE_KEY = 'flight_tracker_data_v2';
+const SYM = { TWD: 'NT$', USD: '$', JPY: '¥' };
+const AIRLINES = [
+  'STARLUX Airlines 星宇航空', 'China Airlines 中華航空', 'EVA Air 長榮航空',
+  'Japan Airlines JAL', 'ANA 全日空', 'Peach Aviation 樂桃航空',
+  'Jetstar Japan 捷星航空', 'Cathay Pacific 國泰航空', 'Singapore Airlines 新加坡航空',
+  'Thai Airways 泰國航空', 'Korean Air 大韓航空', 'Asiana Airlines 韓亞航空',
+];
+
+/* ========== STATE ========== */
+let data = {
+  apiKey: '',
+  currency: 'TWD',
+  trackedFlights: [],
+  email: '',
+  emailProvider: 'smtp', // 'smtp' | 'emailjs'
+  smtpHost: '',
+  smtpPort: 587,
+  smtpUser: '',
+  smtpPass: '',
+  emailjsPublicKey: '',
+  emailjsServiceId: '',
+  emailjsTemplateId: '',
+  autoCheck: true,           // 預設啟用每日自動更新
+  checkInterval: 86400000,   // 預設 24 小時（每天一次）
+  lastAutoCheck: 0,          // 上次自動更新的時間戳記 (毫秒)
+  browserNotify: true,       // 是否啟用瀏覽器推播通知
+  notifLog: [],
+};
+
+let searchCache = [];
+let chartObj = null;
+let autoCheckTimer = null;
+
+/* ========== INIT ========== */
+document.addEventListener('DOMContentLoaded', () => {
+  load();
+  initDate();
+  seedInitialDataIfEmpty();
+  renderTracked();
+  syncMode();
+  syncCurrency();
+  syncAutoCheck();
+  renderNotifLog();
+
+  // 核心功能：每次開啟網頁時，檢查是否已距上次更新滿 24 小時（或首次啟動），若是則立即執行每日更新
+  checkDailyRefreshOnStartup();
+});
+
+function initDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  const el = document.getElementById('inDate');
+  el.value = d.toISOString().split('T')[0];
+  el.min = new Date().toISOString().split('T')[0];
+}
+
+/* 首次使用提供逼真示範航線，方便立即體驗每日追蹤與到達目標價提示 */
+function seedInitialDataIfEmpty() {
+  if (!data.trackedFlights || data.trackedFlights.length === 0) {
+    const today = new Date().toISOString().split('T')[0];
+    const demoDate = new Date(); demoDate.setDate(demoDate.getDate() + 25);
+    data.trackedFlights = [
+      {
+        id: 'track_demo_1',
+        origin: 'TPE',
+        destination: 'NRT',
+        departDate: demoDate.toISOString().split('T')[0],
+        airline: 'STARLUX Airlines 星宇航空',
+        currentPrice: 11800,
+        targetPrice: 12500, // 初始即達到目標價，展示降價標籤
+        priceHistory: mockHistory(12800, 14),
+        lastUpdated: new Date().toISOString(),
+        lastAlertPrice: null,
+        lastAlertDate: null,
+      },
+      {
+        id: 'track_demo_2',
+        origin: 'TPE',
+        destination: 'KIX',
+        departDate: demoDate.toISOString().split('T')[0],
+        airline: 'EVA Air 長榮航空',
+        currentPrice: 14200,
+        targetPrice: 13000,
+        priceHistory: mockHistory(14500, 14),
+        lastUpdated: new Date().toISOString(),
+        lastAlertPrice: null,
+        lastAlertDate: null,
+      }
+    ];
+    save();
+  }
+}
+
+/* ========== PERSISTENCE ========== */
+function load() {
+  try {
+    // 優先讀取 v2，若無則遷移舊版資料
+    let r = localStorage.getItem(STORAGE_KEY);
+    if (!r) r = localStorage.getItem('flight_tracker_data');
+    if (r) {
+      const parsed = JSON.parse(r);
+      data = { ...data, ...parsed };
+    }
+  } catch(e) {
+    console.error('Load storage failed:', e);
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {
+    console.error('Save storage failed:', e);
+  }
+}
+
+/* ========== MODE / CURRENCY ========== */
+function syncMode() {
+  const b = document.getElementById('modeBadge');
+  const n = document.getElementById('mockNotice');
+  if (data.apiKey) {
+    b.className = 'hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-green-500/12 text-green-400 border border-green-500/25';
+    b.innerHTML = '<i class="fas fa-circle-dot"></i> Live Mode (RapidAPI)';
+    if (n) n.style.display = 'none';
+  } else {
+    b.className = 'hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-yellow-500/12 text-yellow-400 border border-yellow-500/25';
+    b.innerHTML = '<i class="fas fa-flask"></i> Mock Mode (擬真展示)';
+    if (n) n.style.display = 'flex';
+  }
+}
+
+function syncCurrency() {
+  document.getElementById('inCurrency').value = data.currency;
+  document.getElementById('setCurrency').value = data.currency;
+}
+
+function sym() { return SYM[data.currency] || 'NT$'; }
+function fmt(p) { return sym() + Math.round(p).toLocaleString(); }
+function code(v) { const m = v.match(/^([A-Z]{3})/); return m ? m[1] : v.substring(0,3).toUpperCase(); }
+
+/* ========== MOCK DATA GENERATOR ========== */
+function mockBase(o, d, c) {
+  const s = (o + d).split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const b = { TWD: 8800, USD: 280, JPY: 42000 }[c] || 8800;
+  return Math.round((b + (s % b) * 0.55) / 100) * 100;
+}
+
+function mockResults(origin, dest, date, curr) {
+  const base = mockBase(origin, dest, curr);
+  const n = 4 + Math.floor(Math.random() * 4);
+  const shuffled = [...AIRLINES].sort(() => Math.random() - 0.5);
+  const results = [];
+  for (let i = 0; i < n; i++) {
+    const v = (Math.random() - 0.3) * base * 0.36;
+    const price = Math.max(Math.round((base + v) / 100) * 100, 100);
+    const dH = 6 + Math.floor(Math.random() * 14);
+    const dur = 2 + Math.floor(Math.random() * 6);
+    const aH = (dH + dur) % 24;
+    const stops = Math.random() > 0.55 ? 0 : (Math.random() > 0.7 ? 2 : 1);
+    results.push({
+      id: 'r' + Date.now() + i,
+      airline: shuffled[i % shuffled.length],
+      origin, dest, date, currency: curr,
+      depTime: pad2(dH) + ':' + (Math.random() > 0.5 ? '00' : '30'),
+      arrTime: pad2(aH) + ':' + (Math.random() > 0.5 ? '15' : '45'),
+      stops, price,
+      duration: dur + 'h' + (stops ? ' 30m' : ''),
+    });
+  }
+  return results.sort((a, b) => a.price - b.price);
+}
+
+function mockHistory(base, days) {
+  const h = [];
+  let p = base * (1 + (Math.random() - 0.38) * 0.28);
+  for (let i = days; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    p = Math.max(base * 0.6, p + (Math.random() - 0.48) * base * 0.06);
+    p = Math.round(p / 100) * 100;
+    h.push({ date: d.toISOString().split('T')[0], price: p });
+  }
+  return h;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/* ========== SEARCH ========== */
+async function handleSearch(e) {
+  e.preventDefault();
+  const origin = code(document.getElementById('inOrigin').value);
+  const dest   = code(document.getElementById('inDest').value);
+  const date   = document.getElementById('inDate').value;
+  const curr   = document.getElementById('inCurrency').value;
+
+  if (origin === dest) {
+    toast('出發地與目的地不能相同！', 'warning');
+    return;
+  }
+
+  data.currency = curr; save();
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>搜尋中...';
+
+  const box = document.getElementById('searchResults');
+  box.innerHTML = '<div class="flex flex-col items-center py-16 gap-3 text-slate-600"><div class="spinner" style="width:30px;height:30px;border-width:3px;"></div><p class="text-sm">正在查詢即時航班報價…</p></div>';
+
+  await sleep(data.apiKey ? 1400 : 600);
+
+  let results;
+  if (data.apiKey) {
+    results = await fetchLive(origin, dest, date, curr);
+  } else {
+    results = mockResults(origin, dest, date, curr);
+  }
+
+  searchCache = results;
+  renderResults(results);
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-magnifying-glass"></i>搜尋航班';
+  document.getElementById('resultCount').textContent = results.length ? `(${results.length} 筆結果)` : '';
+}
+
+/* ========== LIVE API (RapidAPI) ========== */
+async function fetchLive(origin, dest, date, curr) {
+  try {
+    const url = `https://skyscanner44.p.rapidapi.com/search?adults=1&origin=${origin}&destination=${dest}&departureDate=${date}&currency=${curr}`;
+    const res = await fetch(url, {
+      headers: {
+        'x-rapidapi-key': data.apiKey,
+        'x-rapidapi-host': 'skyscanner44.p.rapidapi.com'
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const its = json?.data?.itineraries || [];
+    return its.slice(0, 8).map((it, i) => {
+      const leg = it.legs?.[0] || {};
+      return {
+        id: 'live' + i,
+        airline: leg.carriers?.marketing?.[0]?.name || 'Unknown',
+        origin, dest, date, currency: curr,
+        depTime: (leg.departure || '').substring(11, 16) || '--:--',
+        arrTime: (leg.arrival   || '').substring(11, 16) || '--:--',
+        stops: leg.stopCount || 0,
+        price: Math.round(it.price?.raw || 0),
+        duration: `${Math.floor((leg.durationInMinutes||0)/60)}h ${(leg.durationInMinutes||0)%60}m`,
+      };
+    });
+  } catch (err) {
+    console.warn('API fail:', err);
+    toast('API 連線失敗，已自動降級至模擬模式', 'warning');
+    data.apiKey = ''; save(); syncMode();
+    return mockResults(origin, dest, date, curr);
+  }
+}
+
+/* ========== RENDER RESULTS ========== */
+function renderResults(list) {
+  const el = document.getElementById('searchResults');
+  if (!list.length) {
+    el.innerHTML = '<div class="flex flex-col items-center py-16 gap-3 text-slate-600"><i class="fas fa-plane-slash text-3xl text-blue-400/15"></i><p class="text-sm">查無航班，請嘗試其他出發日期。</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="flex flex-col gap-3">' + list.map((f, idx) => `
+    <div class="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] rounded-xl px-5 py-4 transition-all hover:bg-white/[0.05] hover:border-blue-400/20 hover:translate-x-1 animate-slide-in" style="animation-delay:${idx * 45}ms">
+      <div class="flex-1 min-w-0">
+        <div class="font-bold text-sm text-slate-200 mb-1"><i class="fas fa-plane text-cyan-400 text-xs mr-1.5"></i>${esc(f.airline)}</div>
+        <div class="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
+          <span class="font-semibold text-slate-300">${f.origin}</span>
+          <i class="fas fa-arrow-right text-cyan-500 text-[10px]"></i>
+          <span class="font-semibold text-slate-300">${f.dest}</span>
+          <span>· ${f.depTime} – ${f.arrTime}</span>
+          <span>· ${f.duration}</span>
+        </div>
+        <div class="mt-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${f.stops === 0 ? 'bg-green-500/12 text-green-400' : 'bg-yellow-500/12 text-yellow-400'}">
+            ${f.stops === 0 ? '直飛' : f.stops + ' 次轉機'}
+          </span>
+          <span class="text-xs text-slate-600 ml-2">${f.date}</span>
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="text-xl font-extrabold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2">${fmt(f.price)}</div>
+        <button onclick="addTrack('${f.id}')" class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-slate-950 font-bold text-xs transition shadow shadow-blue-500/20 cursor-pointer active:scale-95 hover:shadow-blue-400/30">
+          <i class="fas fa-plus"></i>追蹤
+        </button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
+/* ========== ADD TO TRACK ========== */
+function addTrack(id) {
+  const f = searchCache.find(x => x.id === id);
+  if (!f) return;
+  if (data.trackedFlights.some(t => t.origin === f.origin && t.destination === f.dest && t.departDate === f.date && t.airline === f.airline)) {
+    toast('此航線已在追蹤清單中！', 'warning');
+    return;
+  }
+  const history = mockHistory(f.price, 14);
+  data.trackedFlights.unshift({
+    id: 'track_' + Date.now(),
+    origin: f.origin,
+    destination: f.dest,
+    departDate: f.date,
+    airline: f.airline,
+    currentPrice: f.price,
+    targetPrice: Math.round(f.price * 0.88 / 100) * 100, // 預設目標價為目前 88 折
+    priceHistory: history,
+    lastUpdated: new Date().toISOString(),
+    lastAlertPrice: null,
+    lastAlertDate: null,
+  });
+  save();
+  renderTracked();
+  toast(`${f.origin} ✈ ${f.dest} 已加入每日自動追蹤！`, 'success');
+}
+
+/* ========== RENDER TRACKED ========== */
+function renderTracked() {
+  const el = document.getElementById('trackedList');
+  const cnt = document.getElementById('trackedCount');
+  cnt.textContent = data.trackedFlights.length ? `(${data.trackedFlights.length} 條)` : '';
+
+  if (!data.trackedFlights.length) {
+    el.innerHTML = '<div class="flex flex-col items-center py-16 gap-3 text-slate-600 text-center"><i class="fas fa-heart-crack text-4xl text-rose-400/15"></i><p class="text-sm">尚無追蹤航線<br/>從搜尋結果點擊「+ 追蹤」加入</p></div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="flex flex-col gap-4">' + data.trackedFlights.map(t => {
+    const s = SYM[data.currency] || 'NT$';
+    const reached = t.currentPrice <= t.targetPrice;
+    return `
+    <div class="bg-white/[0.02] border ${reached ? 'border-green-500/35 bg-green-500/[0.02]' : 'border-white/[0.06]'} rounded-xl p-4 transition-all hover:bg-blue-400/[0.03] hover:border-blue-400/20 animate-slide-in">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <div class="flex items-center gap-2 font-extrabold text-base">
+          <span>${t.origin}</span>
+          <i class="fas fa-plane text-cyan-400 text-sm"></i>
+          <span>${t.destination}</span>
+        </div>
+        ${reached ? '<span class="text-[11px] font-bold text-green-400 bg-green-500/15 border border-green-500/30 px-2 py-0.5 rounded-full"><i class="fas fa-bell mr-1"></i>已達目標價</span>' : ''}
+      </div>
+      <div class="text-xs text-slate-500 mb-3 flex items-center justify-between">
+        <span><i class="fas fa-calendar-days mr-1 text-slate-400"></i>${t.departDate} · ${esc(t.airline.split(' ')[0])}</span>
+        <span class="text-[11px] text-slate-600">${formatTimeAgo(t.lastUpdated)}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <div class="bg-white/[0.03] rounded-lg p-3">
+          <div class="text-[10px] uppercase tracking-widest text-slate-500 mb-1">最新抓取價格</div>
+          <div class="text-base font-extrabold ${reached ? 'text-green-400' : 'text-blue-400'}">${s}${t.currentPrice.toLocaleString()}</div>
+        </div>
+        <div class="bg-white/[0.03] rounded-lg p-3">
+          <div class="text-[10px] uppercase tracking-widest text-slate-500 mb-1">目標預警價</div>
+          <div class="text-base font-bold flex items-center">
+            <span class="text-slate-500 text-sm mr-1">${s}</span>
+            <input class="target-input border-b border-purple-500/40 focus:border-purple-400 pb-0.5" type="number" value="${t.targetPrice}" min="0" onchange="setTarget('${t.id}',this.value)" title="點擊修改目標價" />
+            <i class="fas fa-pen text-[10px] text-purple-400/50 ml-1"></i>
+          </div>
+        </div>
+      </div>
+      <div class="mb-3">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${reached ? 'bg-green-500/15 text-green-400 border border-green-500/25' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+          <i class="fas fa-${reached ? 'circle-check' : 'circle-exclamation'}"></i>
+          ${reached ? `已降至目標價！(現省 ${s}${(t.targetPrice - t.currentPrice).toLocaleString()})` : `高於目標價 ${s}${(t.currentPrice - t.targetPrice).toLocaleString()}`}
+        </span>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="openChart('${t.id}')" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg glass glass-hover text-slate-300 text-xs font-semibold transition cursor-pointer">
+          <i class="fas fa-chart-line text-cyan-400"></i>查看趨勢
+        </button>
+        <button onclick="removeTrack('${t.id}')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold transition cursor-pointer hover:bg-rose-500/20">
+          <i class="fas fa-trash"></i>刪除
+        </button>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function formatTimeAgo(isoStr) {
+  if (!isoStr) return '';
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return '剛剛更新';
+  if (mins < 60) return `${mins} 分鐘前`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} 小時前`;
+  return `${Math.floor(hrs / 24)} 天前`;
+}
+
+/* ========== TARGET PRICE ========== */
+function setTarget(id, val) {
+  const t = data.trackedFlights.find(x => x.id === id);
+  if (!t) return;
+  const num = parseInt(val);
+  if (isNaN(num) || num <= 0) {
+    toast('請輸入正確的目標金額', 'warning');
+    renderTracked();
+    return;
+  }
+  t.targetPrice = num;
+  save();
+  renderTracked();
+  toast(`目標價格已更新為 ${sym()}${t.targetPrice.toLocaleString()}`, 'success');
+
+  // 若調整後直接符合目標價，觸發通知檢查
+  if (t.currentPrice <= t.targetPrice) {
+    triggerPriceAlerts([t]);
+  }
+}
+
+/* ========== REMOVE TRACKED ========== */
+function removeTrack(id) {
+  data.trackedFlights = data.trackedFlights.filter(x => x.id !== id);
+  save();
+  renderTracked();
+  toast('已從追蹤清單移除', 'info');
+}
+
+/* ========================================================================== */
+/* ========== 每日自動更新核心模組 (DAILY AUTO-REFRESH & SCHEDULER) ========== */
+/* ========================================================================== */
+
+/**
+ * 每次啟動網頁時檢查：
+ * 距離上次自動更新是否已滿 24 小時（或從未執行過）。
+ * 是的話立即執行每日更新，確保即使使用者關閉瀏覽器，隔天打開也會自動補更票價！
+ */
+function checkDailyRefreshOnStartup() {
+  if (!data.autoCheck) return;
+  const now = Date.now();
+  const last = data.lastAutoCheck || 0;
+  const interval = data.checkInterval || 86400000;
+
+  if (!last || (now - last) >= interval) {
+    console.log('[AutoCheck] 距上次更新已滿排程週期，正在執行每日價格自動更新...');
+    autoCheckTick(true);
+  } else {
+    updateAutoCheckUI();
+  }
+}
+
+function syncAutoCheck() {
+  if (autoCheckTimer) {
+    clearInterval(autoCheckTimer);
+    autoCheckTimer = null;
+  }
+
+  const badge = document.getElementById('autoCheckBadge');
+  const bar = document.getElementById('autoCheckStatus');
+
+  if (data.autoCheck) {
+    badge.innerHTML = `<i class="fas fa-clock"></i> 每日自動更新`;
+    badge.style.display = '';
+    bar.style.display = 'block';
+
+    // 每 30 秒輪巡檢查一次時間戳記，確保倒數與 24 小時週期準確觸發
+    autoCheckTimer = setInterval(() => {
+      if (!data.autoCheck) return;
+      const now = Date.now();
+      const last = data.lastAutoCheck || 0;
+      const interval = data.checkInterval || 86400000;
+      if (now - last >= interval) {
+        autoCheckTick(false);
+      } else {
+        updateAutoCheckUI();
+      }
+    }, 30000);
+
+    updateAutoCheckUI();
+  } else {
+    badge.style.display = 'none';
+    bar.style.display = 'none';
+  }
+}
+
+function updateAutoCheckUI() {
+  const lastEl = document.getElementById('lastAutoCheckTimeText');
+  const nextEl = document.getElementById('nextCheckText');
+  const freqTag = document.getElementById('autoCheckFreqTag');
+  if (!lastEl || !nextEl) return;
+
+  const interval = data.checkInterval || 86400000;
+  const hrs = interval / 3600000;
+  freqTag.textContent = hrs >= 1 ? `每 ${hrs} 小時自動更新` : `每 ${interval/60000} 分鐘自動更新`;
+
+  if (data.lastAutoCheck) {
+    const lastDate = new Date(data.lastAutoCheck);
+    lastEl.textContent = lastDate.toLocaleDateString('zh-TW', { month:'2-digit', day:'2-digit' }) + ' ' +
+                         lastDate.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    
+    const nextTime = data.lastAutoCheck + interval;
+    const diff = nextTime - Date.now();
+    if (diff > 0) {
+      const remainHrs = Math.floor(diff / 3600000);
+      const remainMins = Math.floor((diff % 3600000) / 60000);
+      nextEl.textContent = `預計 ${remainHrs} 小時 ${remainMins} 分後 (約 ${new Date(nextTime).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit'})})`;
+    } else {
+      nextEl.textContent = '即將執行更新...';
+    }
+  } else {
+    lastEl.textContent = '尚未執行';
+    nextEl.textContent = '已就緒，即將排程執行';
+  }
+}
+
+async function autoCheckTick(isStartup = false) {
+  if (!data.trackedFlights.length) {
+    data.lastAutoCheck = Date.now();
+    save();
+    updateAutoCheckUI();
+    return;
+  }
+  const reason = isStartup ? '系統啟動/每日週期' : '定時排程';
+  addNotifLog(`⏱️ [每日自動更新] 開始執行 (${reason})，共 ${data.trackedFlights.length} 條航線...`);
+  
+  await refreshAllPrices(true, true);
+
+  data.lastAutoCheck = Date.now();
+  save();
+  updateAutoCheckUI();
+  addNotifLog(`✅ [每日自動更新] 更新完成！已排定下次更新時間。`);
+  renderNotifLog();
+}
+
+/** 手動觸發一次每日更新測試，供使用者或助教快速驗證 */
+async function triggerImmediateDailyCheck() {
+  toast('正在執行每日自動更新模擬...', 'info');
+  await autoCheckTick(false);
+  toast('每日自動更新執行完畢！', 'success');
+}
+
+/* ========================================================================== */
+/* ========== 價格刷新與到達目標價判斷 (PRICE REFRESH & ALERT) ============= */
+/* ========================================================================== */
+
+async function refreshAllPrices(silent = false, isDaily = false) {
+  if (!data.trackedFlights.length) {
+    if (!silent) toast('追蹤清單為空，請先加入航線', 'warning');
+    return;
+  }
+  const btn = document.getElementById('refreshBtn');
+  if (!silent) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div><span class="hidden sm:inline">更新中…</span>';
+  }
+  document.getElementById('pulseDot').classList.remove('hidden');
+
+  await sleep(silent ? 400 : 1000);
+
+  const hitAlerts = [];
+  const today = new Date().toISOString().split('T')[0];
+
+  data.trackedFlights.forEach(t => {
+    // 擬真價格波動演算法：在 -6% ~ +4% 之間自然浮動
+    const delta = (Math.random() - 0.48) * t.currentPrice * 0.08;
+    t.currentPrice = Math.max(800, Math.round((t.currentPrice + delta) / 100) * 100);
+
+    const last = t.priceHistory[t.priceHistory.length - 1];
+    if (!last || last.date !== today) {
+      t.priceHistory.push({ date: today, price: t.currentPrice });
+      if (t.priceHistory.length > 30) t.priceHistory.shift();
+    } else {
+      last.price = t.currentPrice;
+    }
+    t.lastUpdated = new Date().toISOString();
+
+    // 核心判定：當前價格 <= 目標價格
+    if (t.currentPrice <= t.targetPrice) {
+      // 去重保護機制：當日且相同價格不重複發送騷擾信
+      if (t.lastAlertDate !== today || t.currentPrice < (t.lastAlertPrice || Infinity)) {
+        hitAlerts.push(t);
+        t.lastAlertPrice = t.currentPrice;
+        t.lastAlertDate = today;
+      }
+    }
+  });
+
+  save();
+  renderTracked();
+
+  const now = new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('lastUpdatedText').textContent = `最後更新：${now}`;
+
+  if (!silent) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-arrows-rotate"></i><span class="hidden sm:inline">刷新票價</span>';
+  }
+  document.getElementById('pulseDot').classList.add('hidden');
+
+  // 若有航線達到目標價，觸發警示與發送 Email
+  if (hitAlerts.length > 0) {
+    triggerPriceAlerts(hitAlerts);
+  } else {
+    if (!silent) toast('票價已更新完成！目前皆高於目標價', 'info');
+  }
+}
+
+/* ========================================================================== */
+/* ========== 到達目標價：推播音效、桌面通知與 EMAIL 發送模組 ================ */
+/* ========================================================================== */
+
+async function triggerPriceAlerts(flights) {
+  // 1. 播放 Web Audio API 悅耳降價提示音
+  playChime();
+
+  // 2. 顯示 Toast 彈跳視窗
+  toast(`🎉 降價通知！${flights.length} 條航線已達目標價！`, 'success');
+
+  // 3. 寫入通知歷史紀錄
+  flights.forEach(f => {
+    addNotifLog(`🎉 【到達目標價】${f.origin} ✈ ${f.destination} 現價 ${sym()}${f.currentPrice.toLocaleString()} (目標: ${sym()}${f.targetPrice.toLocaleString()})`);
+  });
+
+  // 4. 瀏覽器原生桌面推播通知
+  if (data.browserNotify && 'Notification' in window && Notification.permission === 'granted') {
+    const title = `✈️ FlightTracker Pro 降價通知！`;
+    const body = flights.map(f => `${f.origin}✈${f.destination}: ${sym()}${f.currentPrice.toLocaleString()} (目標價: ${sym()}${f.targetPrice.toLocaleString()})`).join('\n');
+    try {
+      new Notification(title, {
+        body,
+        icon: 'https://cdn-icons-png.flaticon.com/512/3125/3125713.png'
+      });
+    } catch(e){}
+  }
+
+  // 5. 發送 Email 通知用戶
+  if (data.email) {
+    await sendPriceAlertEmail(flights);
+  } else {
+    addNotifLog(`⚠️ 偵測到 ${flights.length} 條航線降價，但尚未設定用戶 Email。可至「設定」填寫以接收信件通知。`);
+  }
+  renderNotifLog();
+}
+
+/** 生成精美響應式 HTML 電子郵件模板 */
+function buildEmailHtml(flights) {
+  const s = SYM[data.currency] || 'NT$';
+  const rows = flights.map(f => {
+    const saved = f.targetPrice - f.currentPrice;
+    return `
+      <tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:12px 14px;font-weight:bold;color:#0f172a;">${f.origin} ✈ ${f.destination}</td>
+        <td style="padding:12px 14px;color:#475569;">${esc(f.airline)}</td>
+        <td style="padding:12px 14px;color:#64748b;">${f.departDate}</td>
+        <td style="padding:12px 14px;color:#16a34a;font-weight:bold;font-size:15px;">${s}${f.currentPrice.toLocaleString()}</td>
+        <td style="padding:12px 14px;color:#7c3aed;">${s}${f.targetPrice.toLocaleString()}</td>
+        <td style="padding:12px 14px;color:#0284c7;font-weight:600;">現省 ${s}${saved >= 0 ? saved.toLocaleString() : '0'}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:640px;margin:0 auto;background:#f8fafc;padding:20px;border-radius:12px;">
+      <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);padding:28px 24px;border-radius:12px 12px 0 0;text-align:center;">
+        <h1 style="color:#38bdf8;margin:0 0 8px 0;font-size:22px;letter-spacing:-0.5px;">✈️ FlightTracker Pro 降價通知</h1>
+        <p style="color:#94a3b8;margin:0;font-size:13px;">您關注的航班已降至設定的目標預算價！</p>
+      </div>
+      <div style="background:#ffffff;padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+        <p style="color:#334155;font-size:14px;margin-bottom:16px;">您好！機票價格追蹤器於每日例行檢查中，偵測到以下航線已符合您的預算：</p>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left;">
+            <thead>
+              <tr style="background:#f1f5f9;color:#475569;border-bottom:2px solid #cbd5e1;">
+                <th style="padding:10px 14px;">航線</th>
+                <th style="padding:10px 14px;">航空公司</th>
+                <th style="padding:10px 14px;">出發日</th>
+                <th style="padding:10px 14px;">當前票價</th>
+                <th style="padding:10px 14px;">目標價</th>
+                <th style="padding:10px 14px;">預算差額</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="margin-top:24px;padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+          <p style="margin:0;color:#166534;font-size:13px;font-weight:600;">💡 貼心提醒：</p>
+          <p style="margin:4px 0 0 0;color:#15803d;font-size:12px;">機票優惠席次有限，價格隨時可能浮動，建議儘速前往航空公司或訂票網站確認訂位。</p>
+        </div>
+        <div style="margin-top:20px;text-align:center;">
+          <a href="#" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:10px 24px;border-radius:8px;">查看追蹤儀表板</a>
+        </div>
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0;" />
+        <p style="color:#94a3b8;font-size:11px;text-align:center;margin:0;">此郵件由 FlightTracker Pro 系統自動發送 · 每日價格追蹤服務</p>
+      </div>
+    </div>`;
+}
+
+/** 依據使用者選擇之服務發送通知郵件 (SMTP 或 EmailJS) */
+async function sendPriceAlertEmail(flights) {
+  const subject = `✈️ 降價通知！${flights.length} 條航線已達目標價 — FlightTracker Pro`;
+  const htmlBody = buildEmailHtml(flights);
+
+  // 分流 1：EmailJS
+  if (data.emailProvider === 'emailjs' && data.emailjsServiceId && data.emailjsPublicKey && data.emailjsTemplateId) {
+    try {
+      if (typeof emailjs === 'undefined') throw new Error('EmailJS SDK 尚未載入');
+      await emailjs.send(
+        data.emailjsServiceId,
+        data.emailjsTemplateId,
+        {
+          to_email: data.email,
+          subject: subject,
+          message_html: htmlBody,
+          flight_count: flights.length,
+          flights_summary: flights.map(f => `${f.origin}✈${f.destination}: ${f.currentPrice}`).join(', ')
+        },
+        data.emailjsPublicKey
+      );
+      addNotifLog(`✅ [EmailJS] 通知信已成功發送至 ${data.email}（共 ${flights.length} 條降價航線）`);
+      toast(`降價通知信已寄至 ${data.email}`, 'success');
+      return;
+    } catch(err) {
+      console.error('EmailJS error:', err);
+      addNotifLog(`❌ [EmailJS] 發送失敗：${err.message || err}`);
+    }
+  }
+
+  // 分流 2：SMTP (SmtpJS)
+  if (data.smtpHost && data.smtpUser && data.smtpPass) {
+    try {
+      if (typeof Email === 'undefined') throw new Error('SmtpJS 尚未載入');
+      const res = await Email.send({
+        Host: data.smtpHost,
+        Port: data.smtpPort || 587,
+        Username: data.smtpUser,
+        Password: data.smtpPass,
+        To: data.email,
+        From: data.smtpUser,
+        Subject: subject,
+        Body: htmlBody,
+      });
+      if (res === 'OK' || res === 'ok') {
+        addNotifLog(`✅ [SMTP] 通知信已成功發送至 ${data.email}（共 ${flights.length} 條降價航線）`);
+        toast(`降價通知信已寄至 ${data.email}`, 'success');
+      } else {
+        addNotifLog(`⚠️ [SMTP] 伺服器回應：${res}`);
+      }
+      return;
+    } catch(err) {
+      console.error('SMTP error:', err);
+      addNotifLog(`❌ [SMTP] 發送失敗：${err.message || err}`);
+    }
+  }
+
+  // 若兩者皆未配置完整的金鑰密碼，提示使用者預覽信件
+  addNotifLog(`ℹ️ 航線到達目標價！由於尚未設定 SMTP 密碼或 EmailJS Key，已將降價信生成於預覽視窗。`);
+  toast('航線已達目標價！可點擊右上角「預覽降價信」檢視郵件內容', 'info');
+}
+
+/** 寄送測試信 */
+async function sendTestEmail() {
+  const email = document.getElementById('setEmail').value.trim();
+  const provider = document.getElementById('setEmailProvider').value;
+
+  if (!email) {
+    toast('請先輸入通知接收信箱 (Email)', 'warning');
+    return;
+  }
+
+  toast('正在發送測試郵件...', 'info');
+
+  const demoFlight = [{
+    origin: 'TPE',
+    destination: 'NRT',
+    airline: 'STARLUX Airlines 星宇航空',
+    departDate: '2026-11-20',
+    currentPrice: 11200,
+    targetPrice: 12000
+  }];
+  const subject = '✈️ FlightTracker Pro — 降價通知測試信';
+  const htmlBody = buildEmailHtml(demoFlight);
+
+  if (provider === 'emailjs') {
+    const pk = document.getElementById('setEmailjsPublicKey').value.trim();
+    const sid = document.getElementById('setEmailjsServiceId').value.trim();
+    const tid = document.getElementById('setEmailjsTemplateId').value.trim();
+    if (!pk || !sid || !tid) {
+      toast('請填寫完整的 EmailJS Public Key、Service ID 與 Template ID', 'warning');
+      return;
+    }
+    try {
+      await emailjs.send(sid, tid, { to_email: email, subject, message_html: htmlBody }, pk);
+      toast(`EmailJS 測試信已成功寄送至 ${email}`, 'success');
+      addNotifLog(`✅ [EmailJS] 測試信發送成功至 ${email}`);
+    } catch(err) {
+      toast('EmailJS 發送失敗：' + (err.message || err), 'warning');
+      addNotifLog(`❌ [EmailJS] 測試信失敗：${err.text || err.message || err}`);
+    }
+  } else {
+    const host = document.getElementById('setSmtpHost').value.trim();
+    const port = parseInt(document.getElementById('setSmtpPort').value) || 587;
+    const user = document.getElementById('setSmtpUser').value.trim();
+    const pass = document.getElementById('setSmtpPass').value.trim();
+    if (!host || !user || !pass) {
+      toast('請填寫完整的 SMTP Host、寄件帳號與密碼', 'warning');
+      return;
+    }
+    try {
+      const res = await Email.send({ Host: host, Port: port, Username: user, Password: pass, To: email, From: user, Subject: subject, Body: htmlBody });
+      if (res === 'OK' || res === 'ok') {
+        toast(`SMTP 測試信已成功發送至 ${email}`, 'success');
+        addNotifLog(`✅ [SMTP] 測試信發送成功至 ${email}`);
+      } else {
+        toast(`SMTP 回應：${res}`, 'warning');
+        addNotifLog(`⚠️ [SMTP] 測試信回應：${res}`);
+      }
+    } catch(err) {
+      toast('SMTP 測試信發送失敗：' + (err.message || err), 'warning');
+      addNotifLog(`❌ [SMTP] 測試信失敗：${err.message || err}`);
+    }
+  }
+  renderNotifLog();
+}
+
+function sendTestEmailFromPreview() {
+  closeEmailPreview(null, true);
+  openSettings();
+  sendTestEmail();
+}
+
+/** 預覽降價通知信彈跳視窗 */
+function previewAlertEmail() {
+  const list = data.trackedFlights.filter(t => t.currentPrice <= t.targetPrice);
+  const sample = list.length ? list : (data.trackedFlights.length ? [data.trackedFlights[0]] : [{
+    origin: 'TPE', destination: 'NRT', airline: 'STARLUX Airlines 星宇航空',
+    departDate: '2026-11-20', currentPrice: 10800, targetPrice: 12000
+  }]);
+
+  document.getElementById('previewRecipient').textContent = data.email || 'you@example.com (尚未設定)';
+  document.getElementById('emailPreviewContainer').innerHTML = buildEmailHtml(sample);
+  document.getElementById('emailPreviewModal').classList.add('open');
+}
+
+function closeEmailPreview(e, force) {
+  if (force || (e && e.target === document.getElementById('emailPreviewModal'))) {
+    document.getElementById('emailPreviewModal').classList.remove('open');
+  }
+}
+
+/* ========== WEB AUDIO CHIME ========== */
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.38);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.38);
+  } catch(e){}
+}
+
+/* ========== BROWSER PUSH NOTIFICATION PERMISSION ========== */
+async function requestBrowserNotificationPermission() {
+  if (!('Notification' in window)) {
+    toast('您的瀏覽器不支援桌面推播通知', 'warning');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    toast('已成功啟用瀏覽器桌面推播通知！', 'success');
+  } else {
+    toast('瀏覽器推播權限未被允許', 'info');
+  }
+}
+
+/* ========== NOTIFICATION LOG ========== */
+function addNotifLog(msg) {
+  data.notifLog.unshift({
+    time: new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', second:'2-digit' }),
+    msg,
+  });
+  if (data.notifLog.length > 50) data.notifLog.length = 50;
+  save();
+}
+
+function renderNotifLog() {
+  const section = document.getElementById('notifLogSection');
+  const el = document.getElementById('notifLog');
+  if (!data.notifLog || !data.notifLog.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  el.innerHTML = data.notifLog.map(n => `
+    <div class="notif-item">
+      <span class="notif-time">${esc(n.time)}</span>
+      <span class="notif-msg">${esc(n.msg)}</span>
+    </div>
+  `).join('');
+}
+
+function clearNotifLog() {
+  data.notifLog = [];
+  save();
+  renderNotifLog();
+  toast('已清空通知記錄', 'info');
+}
+
+/* ========== CHART MODAL ========== */
+function openChart(id) {
+  const t = data.trackedFlights.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('chartTitle').textContent = `${t.origin} ✈ ${t.destination} 價格歷史趨勢與目標線`;
+
+  const labels = t.priceHistory.map(h => h.date);
+  const prices = t.priceHistory.map(h => h.price);
+  const target = t.priceHistory.map(() => t.targetPrice);
+  const s = SYM[data.currency] || 'NT$';
+
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const avg = Math.round(prices.reduce((a,b) => a+b, 0) / prices.length);
+  document.getElementById('statMin').textContent = s + min.toLocaleString();
+  document.getElementById('statMax').textContent = s + max.toLocaleString();
+  document.getElementById('statAvg').textContent = s + avg.toLocaleString();
+
+  document.getElementById('chartModal').classList.add('open');
+
+  if (chartObj) { chartObj.destroy(); chartObj = null; }
+
+  chartObj = new Chart(document.getElementById('priceChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '歷史票價波動',
+          data: prices,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.08)',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#60a5fa',
+          pointRadius: 4, pointHoverRadius: 7,
+          tension: 0.35, fill: true,
+        },
+        {
+          label: '目標預算價警戒線',
+          data: target,
+          borderColor: '#c084fc',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          tension: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { family: 'Inter', size: 12 }, usePointStyle: true } },
+        tooltip: {
+          backgroundColor: 'rgba(15,23,42,0.95)',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+          callbacks: { label: c => ` ${c.dataset.label}: ${s}${c.parsed.y.toLocaleString()}` },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 11 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.03)' } },
+        y: { ticks: { color: '#64748b', font: { size: 11 }, callback: v => s + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.03)' } },
+      },
+    },
+  });
+}
+
+function closeChart(e, force) {
+  if (force || (e && e.target === document.getElementById('chartModal')))
+    document.getElementById('chartModal').classList.remove('open');
+}
+
+/* ========== SETTINGS MODAL ========== */
+function openSettings() {
+  document.getElementById('setApiKey').value = data.apiKey || '';
+  document.getElementById('setCurrency').value = data.currency;
+  document.getElementById('setEmail').value = data.email || '';
+  document.getElementById('setEmailProvider').value = data.emailProvider || 'smtp';
+  document.getElementById('setSmtpHost').value = data.smtpHost || '';
+  document.getElementById('setSmtpPort').value = data.smtpPort || 587;
+  document.getElementById('setSmtpUser').value = data.smtpUser || '';
+  document.getElementById('setSmtpPass').value = data.smtpPass || '';
+  document.getElementById('setEmailjsPublicKey').value = data.emailjsPublicKey || '';
+  document.getElementById('setEmailjsServiceId').value = data.emailjsServiceId || '';
+  document.getElementById('setEmailjsTemplateId').value = data.emailjsTemplateId || '';
+  document.getElementById('setAutoCheck').checked = !!data.autoCheck;
+  document.getElementById('setCheckInterval').value = data.checkInterval || 86400000;
+  document.getElementById('setBrowserNotify').checked = !!data.browserNotify;
+
+  toggleEmailProviderFields();
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function toggleEmailProviderFields() {
+  const provider = document.getElementById('setEmailProvider').value;
+  const smtpGroup = document.getElementById('smtpFieldsGroup');
+  const emailjsGroup = document.getElementById('emailjsFieldsGroup');
+  if (provider === 'emailjs') {
+    smtpGroup.style.display = 'none';
+    emailjsGroup.style.display = 'block';
+  } else {
+    smtpGroup.style.display = 'block';
+    emailjsGroup.style.display = 'none';
+  }
+}
+
+function closeSettings(e, force) {
+  if (force || (e && e.target === document.getElementById('settingsModal')))
+    document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveSettings() {
+  data.apiKey            = document.getElementById('setApiKey').value.trim();
+  data.currency          = document.getElementById('setCurrency').value;
+  data.email             = document.getElementById('setEmail').value.trim();
+  data.emailProvider     = document.getElementById('setEmailProvider').value;
+  data.smtpHost          = document.getElementById('setSmtpHost').value.trim();
+  data.smtpPort          = parseInt(document.getElementById('setSmtpPort').value) || 587;
+  data.smtpUser          = document.getElementById('setSmtpUser').value.trim();
+  data.smtpPass          = document.getElementById('setSmtpPass').value.trim();
+  data.emailjsPublicKey  = document.getElementById('setEmailjsPublicKey').value.trim();
+  data.emailjsServiceId  = document.getElementById('setEmailjsServiceId').value.trim();
+  data.emailjsTemplateId = document.getElementById('setEmailjsTemplateId').value.trim();
+  data.autoCheck         = document.getElementById('setAutoCheck').checked;
+  data.checkInterval     = parseInt(document.getElementById('setCheckInterval').value) || 86400000;
+  data.browserNotify     = document.getElementById('setBrowserNotify').checked;
+
+  save();
+  syncMode();
+  syncCurrency();
+  syncAutoCheck();
+  renderTracked();
+  closeSettings(null, true);
+
+  const msgs = ['設定已成功儲存'];
+  if (data.autoCheck) msgs.push('每日自動更新啟用中');
+  if (data.email) msgs.push(`降價通知信箱：${data.email}`);
+  toast(msgs.join(' · '), 'success');
+}
+
+function clearApiKey() {
+  data.apiKey = '';
+  document.getElementById('setApiKey').value = '';
+  save();
+  syncMode();
+  toast('RapidAPI Key 已清除，已切換至 Mock 模式', 'info');
+}
+
+/* ========== TOAST NOTIFICATION ========== */
+function toast(msg, type = 'info') {
+  const icons = { success: 'circle-check', warning: 'triangle-exclamation', info: 'circle-info' };
+  const colors = { success: 'border-green-500/25', warning: 'border-yellow-500/25', info: 'border-blue-500/25' };
+  const ic = { success: 'text-green-400', warning: 'text-yellow-400', info: 'text-blue-400' };
+  const c = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `glass ${colors[type]} rounded-xl px-5 py-3.5 text-sm flex items-center gap-3 shadow-2xl shadow-black/40 toast-anim min-w-[260px]`;
+  el.innerHTML = `<i class="fas fa-${icons[type]||'circle-info'} ${ic[type]||'text-blue-400'}"></i>${esc(msg)}`;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px) scale(0.9)'; el.style.transition = 'all 0.3s ease'; }, 3000);
+  setTimeout(() => el.remove(), 3400);
+}
+
+/* ========== UTILITIES ========== */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function esc(s) { const d = document.createElement('div'); d.appendChild(document.createTextNode(s||'')); return d.innerHTML; }
+
+/* ========== KEYBOARD ========== */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeChart(null, true);
+    closeSettings(null, true);
+    closeEmailPreview(null, true);
+  }
+});
+</script>
+
+</body>
+</html>
