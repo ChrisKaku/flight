@@ -1640,6 +1640,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function esc(s) { const d = document.createElement('div'); d.appendChild(document.createTextNode(s||'')); return d.innerHTML; }
 
 /* ========== KEYBOARD ========== */
+  /* ========== KEYBOARD ========== */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeChart(null, true);
